@@ -11,6 +11,7 @@ use SetaPDF_Core_Document;
 use SetaPDF_Core_Reader_FilePath;
 use SetaPDF_Core_Type_Dictionary;
 use SetaPDF_Signer_Asn1_Element;
+use SetaPDF_Signer_Asn1_Oid;
 use SetaPDF_Signer_Digest as Digest;
 use SetaPDF_Signer_Exception;
 use SetaPDF_Signer_Signature_DictionaryInterface;
@@ -396,6 +397,59 @@ class Module implements
         if ($signatureAlgorithm === null) {
             $signatureAlgorithm = $this->findSignatureAlgorithm();
             $this->setSignatureAlgorithm($signatureAlgorithm);
+        }
+
+        // update CMS SignatureAlgorithmIdentifier according to Probabilistic Signature Scheme (RSASSA-PSS)
+        if (\in_array($signatureAlgorithm, ['PS256', 'PS384', 'PS512'], true)) {
+            $cms = $this->padesModule->getCms();
+
+            $signatureAlgorithmIdentifier = SetaPDF_Signer_Asn1_Element::findByPath('1/0/4/0/4', $cms);
+            $signatureAlgorithmIdentifier->getChild(0)->setValue(SetaPDF_Signer_Asn1_Oid::encode("1.2.840.113549.1.1.10"));
+            $signatureAlgorithmIdentifier->removeChild($signatureAlgorithmIdentifier->getChild(1));
+            $signatureAlgorithmIdentifier->addChild(new SetaPDF_Signer_Asn1_Element(
+                SetaPDF_Signer_Asn1_Element::SEQUENCE | SetaPDF_Signer_Asn1_Element::IS_CONSTRUCTED, '',
+                [
+                    new SetaPDF_Signer_Asn1_Element(
+                        SetaPDF_Signer_Asn1_Element::TAG_CLASS_CONTEXT_SPECIFIC | SetaPDF_Signer_Asn1_Element::IS_CONSTRUCTED, '',
+                        [
+                            new SetaPDF_Signer_Asn1_Element(
+                                SetaPDF_Signer_Asn1_Element::SEQUENCE | SetaPDF_Signer_Asn1_Element::IS_CONSTRUCTED, '',
+                                [
+                                    new SetaPDF_Signer_Asn1_Element(
+                                        SetaPDF_Signer_Asn1_Element::OBJECT_IDENTIFIER,
+                                        SetaPDF_Signer_Asn1_Oid::encode(Digest::getOid($this->padesModule->getDigest()))
+                                    ),
+                                    new SetaPDF_Signer_Asn1_Element(SetaPDF_Signer_Asn1_Element::NULL)
+                                ]
+                            )
+                        ]
+                    ),
+                    new SetaPDF_Signer_Asn1_Element(
+                        SetaPDF_Signer_Asn1_Element::TAG_CLASS_CONTEXT_SPECIFIC | SetaPDF_Signer_Asn1_Element::IS_CONSTRUCTED | "\x01", '',
+                        [
+                            new SetaPDF_Signer_Asn1_Element(
+                                SetaPDF_Signer_Asn1_Element::SEQUENCE | SetaPDF_Signer_Asn1_Element::IS_CONSTRUCTED, '',
+                                [
+                                    new SetaPDF_Signer_Asn1_Element(
+                                        SetaPDF_Signer_Asn1_Element::OBJECT_IDENTIFIER,
+                                        SetaPDF_Signer_Asn1_Oid::encode('1.2.840.113549.1.1.8')
+                                    ),
+                                    new SetaPDF_Signer_Asn1_Element(
+                                        SetaPDF_Signer_Asn1_Element::SEQUENCE | SetaPDF_Signer_Asn1_Element::IS_CONSTRUCTED, '',
+                                        [
+                                            new SetaPDF_Signer_Asn1_Element(
+                                                SetaPDF_Signer_Asn1_Element::OBJECT_IDENTIFIER,
+                                                SetaPDF_Signer_Asn1_Oid::encode(Digest::getOid($this->padesModule->getDigest()))
+                                            ),
+                                            new SetaPDF_Signer_Asn1_Element(SetaPDF_Signer_Asn1_Element::NULL)
+                                        ]
+                                    )
+                                ]
+                            )
+                        ]
+                    ),
+                ]
+            ));
         }
 
         // get the hash data from the module
