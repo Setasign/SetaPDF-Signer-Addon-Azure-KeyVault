@@ -20,7 +20,7 @@ $alg = isset($settings['alg']) ? $settings['alg'] : null;
 
 $httpClient = new Client(new GuzzleClient([
     'http_errors' => false,
-    'verify' => './cert.pem'
+    //'verify' => './cert.pem'
 ]));
 $azureModule = new AzureKeyVaultModule(
     $vaultBaseUrl,
