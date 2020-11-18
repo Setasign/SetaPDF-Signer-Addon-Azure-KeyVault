@@ -1,0 +1,36 @@
+{
+    "name": "setasign/setapdf-signer-addon-azure-keyvault",
+    "description": "",
+    "minimum-stability": "stable",
+    "license": "MIT",
+    "homepage": "https://github.com/Setasign/SetaPDF-Signer-Addon-Azure-KeyVault",
+    "authors": [
+        {
+            "name": "Setasign",
+            "email": "support@setasign.com"
+        }
+    ],
+    "require": {
+        "php": ">=5.6",
+        "ext-json": "*",
+        "psr/http-client": "^1.0",
+        "psr/http-factory": "^1.0",
+        "setasign/setapdf-signer": "^2.0"
+    },
+    "require-dev": {
+        "guzzlehttp/guzzle": "^6.5",
+        "http-interop/http-factory-guzzle": "^1.0",
+        "mjelamanov/psr18-guzzle": "^1.3"
+    },
+    "autoload": {
+        "psr-4": {
+            "setasign\\SetaPDF\\Signer\\Module\\AzureKeyVault\\": "src"
+        }
+    },
+    "repositories": [
+        {
+            "type": "composer",
+            "url": "https://www.setasign.com/downloads/"
+        }
+    ]
+}
