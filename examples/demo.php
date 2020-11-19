@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use GuzzleHttp\Client as GuzzleClient;
 use Mjelamanov\GuzzlePsr18\Client;
 use Http\Factory\Guzzle\RequestFactory;
@@ -18,10 +20,12 @@ $certificateVersion = $settings['certificateVersion'];
 $digest = isset($settings['digest']) ? $settings['digest'] : null;
 $alg = isset($settings['alg']) ? $settings['alg'] : null;
 
-$httpClient = new Client(new GuzzleClient([
-    'http_errors' => false,
-    //'verify' => './cert.pem'
-]));
+$guzzleOptions = ['http_errors' => false];
+if (file_exists(__DIR__ . '/cert.pem')) {
+    $guzzleOptions['verify'] = __DIR__ . '/cert.pem';
+}
+
+$httpClient = new Client(new GuzzleClient($guzzleOptions));
 $azureModule = new AzureKeyVaultModule(
     $vaultBaseUrl,
     $certificateName,

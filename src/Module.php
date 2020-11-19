@@ -1,5 +1,12 @@
 <?php
 
+/**
+ * @copyright Copyright (c) 2020 Setasign - Jan Slabon (https://www.setasign.com)
+ * @license   http://opensource.org/licenses/mit-license The MIT License
+ */
+
+declare(strict_types=1);
+
 namespace setasign\SetaPDF\Signer\Module\AzureKeyVault;
 
 use InvalidArgumentException;
@@ -20,70 +27,73 @@ use SetaPDF_Signer_Signature_Module_ModuleInterface;
 use SetaPDF_Signer_Signature_Module_Pades;
 use SetaPDF_Signer_X509_Certificate;
 
+/**
+ * The signature module for the SetaPDF-Signer component
+ */
 class Module implements
     SetaPDF_Signer_Signature_Module_ModuleInterface,
     SetaPDF_Signer_Signature_DictionaryInterface,
     SetaPDF_Signer_Signature_DocumentInterface
 {
     /**
-     * @var string
+     * @var string The base url of your key vault.
      */
     private $vaultBaseUrl;
 
     /**
-     * @var string
+     * @var string The name of your key.
      */
     private $certificateName;
 
     /**
-     * @var string
+     * @var string The version of your key.
      */
     private $certificateVersion;
 
     /**
-     * @var ClientInterface
+     * @var ClientInterface PSR-18 HTTP Client implementation.
      */
     private $httpClient;
 
     /**
-     * @var RequestFactoryInterface
+     * @var RequestFactoryInterface PSR-17 HTTP Factory implementation.
      */
     private $requestFactory;
 
     /**
-     * @var StreamFactoryInterface
+     * @var StreamFactoryInterface PSR-17 HTTP Factory implementation.
      */
     private $streamFactory;
 
     /**
-     * @var SetaPDF_Signer_Signature_Module_Pades
+     * @var SetaPDF_Signer_Signature_Module_Pades Internal pades module.
      */
     private $padesModule;
 
     /**
-     * @var null|string
+     * @var null|string Active access token.
      */
     private $accessToken;
 
     /**
-     * @var null|string
+     * @var null|string Forced signature algorithm.
      */
     private $signatureAlgorithm;
 
     /**
      * Module constructor.
      *
-     * @param string $vaultBaseUrl
-     * @param string $certificateName
-     * @param string $certificateVersion
-     * @param ClientInterface $httpClient
-     * @param RequestFactoryInterface $requestFactory
-     * @param StreamFactoryInterface $streamFactory
+     * @param string $vaultBaseUrl The base url of your key vault.
+     * @param string $certificateName The name of your key.
+     * @param string $certificateVersion The version of your key.
+     * @param ClientInterface $httpClient PSR-18 HTTP Client implementation.
+     * @param RequestFactoryInterface $requestFactory PSR-17 HTTP Factory implementation.
+     * @param StreamFactoryInterface $streamFactory PSR-17 HTTP Factory implementation.
      */
     public function __construct(
-        $vaultBaseUrl,
-        $certificateName,
-        $certificateVersion,
+        string $vaultBaseUrl,
+        string $certificateName,
+        string $certificateVersion,
         ClientInterface $httpClient,
         RequestFactoryInterface $requestFactory,
         StreamFactoryInterface $streamFactory
@@ -98,29 +108,40 @@ class Module implements
     }
 
     /**
-     * @param string $digest
+     * Set the digest algorithm to use when signing.
+     *
+     * @param string $digest Allowed values are sha256, sha386, sha512
      * @see SetaPDF_Signer_Signature_Module_Pades::setDigest()
      */
-    public function setDigest($digest)
+    public function setDigest(string $digest)
     {
         $this->padesModule->setDigest($digest);
     }
 
-    public function getDigest()
+    /**
+     * Get the digest algorithm.
+     *
+     * @return string
+     */
+    public function getDigest(): string
     {
         return $this->padesModule->getDigest();
     }
 
     /**
-     * @param string $algorithm
+     * Enforce the used signature algorithm.
+     *
+     * @param string $algorithm See azure documentation for the available options.
      * @see https://docs.microsoft.com/de-de/rest/api/keyvault/sign/sign
      */
-    public function setSignatureAlgorithm($algorithm)
+    public function setSignatureAlgorithm(string $algorithm)
     {
         $this->signatureAlgorithm = $algorithm;
     }
 
     /**
+     * Get the forced signature algorithm.
+     *
      * @return string|null
      */
     public function getSignatureAlgorithm()
@@ -129,10 +150,13 @@ class Module implements
     }
 
     /**
+     * Search for the matching signature algorithm in the used certificate.
+     * Note: if the certificate isn't set yet it will be fetched first.
+     *
      * @return string
      * @throws SetaPDF_Signer_Exception
      */
-    public function findSignatureAlgorithm()
+    public function findSignatureAlgorithm(): string
     {
         // ensure certificate
         $certificate = $this->padesModule->getCertificate();
@@ -193,8 +217,9 @@ class Module implements
     /**
      * @param string $data
      * @return false|string
+     * @see https://tools.ietf.org/html/rfc4648#section-5
      */
-    protected function base64url_decode($data)
+    protected function base64url_decode(string $data)
     {
         return base64_decode(strtr($data, '-_', '+/'));
     }
@@ -202,8 +227,9 @@ class Module implements
     /**
      * @param string $data
      * @return string
+     * @see https://tools.ietf.org/html/rfc4648#section-5
      */
-    protected function base64url_encode($data)
+    protected function base64url_encode(string $data)
     {
         return rtrim(strtr(base64_encode($data), '+/', '-_'), '=');
     }
@@ -211,13 +237,13 @@ class Module implements
     /**
      * json_decode wrapper to handle invalid json. Can be removed with php7.3 and JSON_THROW_ON_ERROR
      *
-     * @param string $json
-     * @param bool $assoc
+     * @param string $json The json string being decoded. This function only works with UTF-8 encoded strings.
+     * @param bool $assoc When TRUE, returned objects will be converted into associative arrays.
      * @param int $depth
      * @param int $options
      * @return mixed
      */
-    protected function json_decode($json, $assoc = false, $depth = 512, $options = 0)
+    protected function json_decode(string $json, bool $assoc = false, int $depth = 512, int $options = 0)
     {
         // Clear json_last_error()
         \json_encode(null);
@@ -234,20 +260,31 @@ class Module implements
     }
 
     /**
-     * @param string $tenant
-     * @param string $appClientId
-     * @param string $appClientSecret
-     * @param string $scope
-     * @return array{accessToken: string, expires: int}
+     * Create an access token by an shared secret.
+     *
+     * @param string $tenant The directory tenant the application plans to operate against, in GUID or domain-name
+     *                       format.
+     * @param string $appClientId The application ID that's assigned to your app. You can find this information in the
+     *                            portal where you registered your app.
+     * @param string $appClientSecret The client secret that you generated for your app in the app registration portal.
+     *                                The client secret must be URL-encoded before being sent.
+     * @param string $scope The value passed for the scope parameter in this request should be the resource identifier
+     *                      (application ID URI) of the resource you want, affixed with the .default suffix. For the
+     *                      Microsoft Graph example, the value is https://graph.microsoft.com/.default. This value
+     *                      tells the Microsoft identity platform endpoint that of all the direct application
+     *                      permissions you have configured for your app, the endpoint should issue a token for the
+     *                      ones associated with the resource you want to use. To learn more about the /.default scope,
+     *                      see the consent documentation.
+     * @return array{accessToken: string, expires: int Timestamp}
      * @throws Exception
      * @see https://docs.microsoft.com/en-us/azure/active-directory/develop/v2-oauth2-client-creds-grant-flow#first-case-access-token-request-with-a-shared-secret
      */
     public function createTokenBySharedSecret(
-        $tenant,
-        $appClientId,
-        $appClientSecret,
-        $scope = 'https://vault.azure.net/.default'
-    ) {
+        string $tenant,
+        string $appClientId,
+        string $appClientSecret,
+        string $scope = 'https://vault.azure.net/.default'
+    ): array {
         try {
             $response = $this->httpClient->sendRequest(
                 $this->requestFactory->createRequest(
@@ -286,12 +323,26 @@ class Module implements
     }
 
     /**
-     * @return SetaPDF_Signer_X509_Certificate
+     * Sets the access token to authenticate to the web API.
+     *
+     * @param string $accessToken
+     */
+    public function setAccessToken(string $accessToken)
+    {
+        $this->accessToken = $accessToken;
+    }
+
+    /**
+     * Fetch the certificate from the azure key vault.
+     *
+     * You can use this to cache the certificate locally.
+     *
+     * @return SetaPDF_Signer_X509_Certificate The certificate from the azure key vault.
      * @throws Exception
      * @throws \SetaPDF_Signer_Asn1_Exception
      * @see https://docs.microsoft.com/de-de/rest/api/keyvault/getcertificate/getcertificate
      */
-    public function fetchCertificate()
+    public function fetchCertificate(): SetaPDF_Signer_X509_Certificate
     {
         try {
             $response = $this->httpClient->sendRequest(
@@ -323,12 +374,17 @@ class Module implements
     }
 
     /**
+     * Creates a signature from a digest using the specified key.
+     *
+     * The SIGN operation is applicable to asymmetric and symmetric keys stored in Azure Key Vault since this operation
+     * uses the private portion of the key. This operation requires the keys/sign permission.
+     *
      * @param string $digest
      * @return string
      * @throws SetaPDF_Signer_Exception
      * @see https://docs.microsoft.com/de-de/rest/api/keyvault/sign/sign
      */
-    protected function sign($digest)
+    protected function sign(string $digest): string
     {
         try {
             $response = $this->httpClient->sendRequest(
@@ -364,11 +420,6 @@ class Module implements
         return $json['value'];
     }
 
-    public function setAccessToken($accessToken)
-    {
-        $this->accessToken = $accessToken;
-    }
-
     /**
      * @param $certificate
      * @throws \SetaPDF_Signer_Asn1_Exception
@@ -379,9 +430,7 @@ class Module implements
     }
 
     /**
-     * @param SetaPDF_Core_Reader_FilePath $tmpPath
-     * @return string|void
-     * @throws \SetaPDF_Signer_Exception
+     * @inheritDoc
      */
     public function createSignature(SetaPDF_Core_Reader_FilePath $tmpPath)
     {
@@ -404,16 +453,23 @@ class Module implements
             $cms = $this->padesModule->getCms();
 
             $signatureAlgorithmIdentifier = SetaPDF_Signer_Asn1_Element::findByPath('1/0/4/0/4', $cms);
-            $signatureAlgorithmIdentifier->getChild(0)->setValue(SetaPDF_Signer_Asn1_Oid::encode("1.2.840.113549.1.1.10"));
+            $signatureAlgorithmIdentifier->getChild(0)->setValue(
+                SetaPDF_Signer_Asn1_Oid::encode("1.2.840.113549.1.1.10")
+            );
             $signatureAlgorithmIdentifier->removeChild($signatureAlgorithmIdentifier->getChild(1));
             $signatureAlgorithmIdentifier->addChild(new SetaPDF_Signer_Asn1_Element(
-                SetaPDF_Signer_Asn1_Element::SEQUENCE | SetaPDF_Signer_Asn1_Element::IS_CONSTRUCTED, '',
+                SetaPDF_Signer_Asn1_Element::SEQUENCE | SetaPDF_Signer_Asn1_Element::IS_CONSTRUCTED,
+                '',
                 [
                     new SetaPDF_Signer_Asn1_Element(
-                        SetaPDF_Signer_Asn1_Element::TAG_CLASS_CONTEXT_SPECIFIC | SetaPDF_Signer_Asn1_Element::IS_CONSTRUCTED, '',
+                        SetaPDF_Signer_Asn1_Element::TAG_CLASS_CONTEXT_SPECIFIC
+                        | SetaPDF_Signer_Asn1_Element::IS_CONSTRUCTED,
+                        '',
                         [
                             new SetaPDF_Signer_Asn1_Element(
-                                SetaPDF_Signer_Asn1_Element::SEQUENCE | SetaPDF_Signer_Asn1_Element::IS_CONSTRUCTED, '',
+                                SetaPDF_Signer_Asn1_Element::SEQUENCE
+                                | SetaPDF_Signer_Asn1_Element::IS_CONSTRUCTED,
+                                '',
                                 [
                                     new SetaPDF_Signer_Asn1_Element(
                                         SetaPDF_Signer_Asn1_Element::OBJECT_IDENTIFIER,
@@ -425,21 +481,30 @@ class Module implements
                         ]
                     ),
                     new SetaPDF_Signer_Asn1_Element(
-                        SetaPDF_Signer_Asn1_Element::TAG_CLASS_CONTEXT_SPECIFIC | SetaPDF_Signer_Asn1_Element::IS_CONSTRUCTED | "\x01", '',
+                        SetaPDF_Signer_Asn1_Element::TAG_CLASS_CONTEXT_SPECIFIC
+                        | SetaPDF_Signer_Asn1_Element::IS_CONSTRUCTED
+                        | "\x01",
+                        '',
                         [
                             new SetaPDF_Signer_Asn1_Element(
-                                SetaPDF_Signer_Asn1_Element::SEQUENCE | SetaPDF_Signer_Asn1_Element::IS_CONSTRUCTED, '',
+                                SetaPDF_Signer_Asn1_Element::SEQUENCE
+                                | SetaPDF_Signer_Asn1_Element::IS_CONSTRUCTED,
+                                '',
                                 [
                                     new SetaPDF_Signer_Asn1_Element(
                                         SetaPDF_Signer_Asn1_Element::OBJECT_IDENTIFIER,
                                         SetaPDF_Signer_Asn1_Oid::encode('1.2.840.113549.1.1.8')
                                     ),
                                     new SetaPDF_Signer_Asn1_Element(
-                                        SetaPDF_Signer_Asn1_Element::SEQUENCE | SetaPDF_Signer_Asn1_Element::IS_CONSTRUCTED, '',
+                                        SetaPDF_Signer_Asn1_Element::SEQUENCE
+                                        | SetaPDF_Signer_Asn1_Element::IS_CONSTRUCTED,
+                                        '',
                                         [
                                             new SetaPDF_Signer_Asn1_Element(
                                                 SetaPDF_Signer_Asn1_Element::OBJECT_IDENTIFIER,
-                                                SetaPDF_Signer_Asn1_Oid::encode(Digest::getOid($this->padesModule->getDigest()))
+                                                SetaPDF_Signer_Asn1_Oid::encode(Digest::getOid(
+                                                    $this->padesModule->getDigest()
+                                                ))
                                             ),
                                             new SetaPDF_Signer_Asn1_Element(SetaPDF_Signer_Asn1_Element::NULL)
                                         ]
@@ -488,16 +553,28 @@ class Module implements
         return (string) $this->padesModule->getCms();
     }
 
+    /**
+     * @inheritDoc
+     */
     public function updateSignatureDictionary(SetaPDF_Core_Type_Dictionary $dictionary)
     {
         $this->padesModule->updateSignatureDictionary($dictionary);
     }
 
+    /**
+     * @inheritDoc
+     */
     public function updateDocument(SetaPDF_Core_Document $document)
     {
         $this->padesModule->updateDocument($document);
     }
 
+    /**
+     * Get the complete Cryptographic Message Syntax structure.
+     *
+     * @return SetaPDF_Signer_Asn1_Element
+     * @throws SetaPDF_Signer_Exception
+     */
     public function getCms()
     {
         return $this->padesModule->getCms();
