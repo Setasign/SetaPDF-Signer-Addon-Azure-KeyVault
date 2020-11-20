@@ -37,7 +37,7 @@ Add following to your composer.json:
 ```json
 {
     "require": {
-        "setasign/seta-pdf-signer-addon-azure-keyvault": "^1.0"
+        "setasign/setapdf-signer-addon-azure-keyvault": "^1.0"
     },
     "repositories": [
         {
@@ -59,7 +59,7 @@ component. If you want to use it with an evaluation version please use following
 ```json
 {
     "require": {
-        "setasign/seta-pdf-signer-addon-azure-keyvault": "dev-evaluation"
+        "setasign/setapdf-signer-addon-azure-keyvault": "dev-evaluation"
     },
     "repositories": [
         {
