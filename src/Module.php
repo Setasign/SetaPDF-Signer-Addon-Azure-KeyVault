@@ -14,11 +14,11 @@ use Psr\Http\Client\ClientExceptionInterface;
 use Psr\Http\Client\ClientInterface;
 use Psr\Http\Message\RequestFactoryInterface;
 use Psr\Http\Message\StreamFactoryInterface;
-use SetaPDF_Core_Document;
-use SetaPDF_Core_Reader_FilePath;
-use SetaPDF_Core_Type_Dictionary;
-use SetaPDF_Signer_Asn1_Element;
-use SetaPDF_Signer_Asn1_Oid;
+use SetaPDF_Core_Document as Document;
+use SetaPDF_Core_Reader_FilePath as FilePath;
+use SetaPDF_Core_Type_Dictionary as Dictionary;
+use SetaPDF_Signer_Asn1_Element as Asn1Element;
+use SetaPDF_Signer_Asn1_Oid as Asn1Oid;
 use SetaPDF_Signer_Digest as Digest;
 use SetaPDF_Signer_Exception;
 use SetaPDF_Signer_Signature_DictionaryInterface;
@@ -38,47 +38,47 @@ class Module implements
     /**
      * @var string The base url of your key vault.
      */
-    private $vaultBaseUrl;
+    protected $vaultBaseUrl;
 
     /**
      * @var string The name of your key.
      */
-    private $certificateName;
+    protected $certificateName;
 
     /**
      * @var string The version of your key.
      */
-    private $certificateVersion;
+    protected $certificateVersion;
 
     /**
      * @var ClientInterface PSR-18 HTTP Client implementation.
      */
-    private $httpClient;
+    protected $httpClient;
 
     /**
      * @var RequestFactoryInterface PSR-17 HTTP Factory implementation.
      */
-    private $requestFactory;
+    protected $requestFactory;
 
     /**
      * @var StreamFactoryInterface PSR-17 HTTP Factory implementation.
      */
-    private $streamFactory;
+    protected $streamFactory;
 
     /**
      * @var SetaPDF_Signer_Signature_Module_Pades Internal pades module.
      */
-    private $padesModule;
+    protected $padesModule;
 
     /**
      * @var null|string Active access token.
      */
-    private $accessToken;
+    protected $accessToken;
 
     /**
      * @var null|string Forced signature algorithm.
      */
-    private $signatureAlgorithm;
+    protected $signatureAlgorithm;
 
     /**
      * Module constructor.
@@ -151,6 +151,7 @@ class Module implements
 
     /**
      * Search for the matching signature algorithm in the used certificate.
+     *
      * Note: if the certificate isn't set yet it will be fetched first.
      *
      * @return string
@@ -260,7 +261,7 @@ class Module implements
     }
 
     /**
-     * Create an access token by an shared secret.
+     * Create an access token by a shared secret.
      *
      * @param string $tenant The directory tenant the application plans to operate against, in GUID or domain-name
      *                       format.
@@ -333,7 +334,7 @@ class Module implements
     }
 
     /**
-     * Fetch the certificate from the azure key vault.
+     * Fetch the certificate from azure key vault.
      *
      * You can use this to cache the certificate locally.
      *
@@ -432,7 +433,7 @@ class Module implements
     /**
      * @inheritDoc
      */
-    public function createSignature(SetaPDF_Core_Reader_FilePath $tmpPath)
+    public function createSignature(FilePath $tmpPath)
     {
         // ensure certificate
         $certificate = $this->padesModule->getCertificate();
@@ -452,61 +453,55 @@ class Module implements
         if (\in_array($signatureAlgorithm, ['PS256', 'PS384', 'PS512'], true)) {
             $cms = $this->padesModule->getCms();
 
-            $signatureAlgorithmIdentifier = SetaPDF_Signer_Asn1_Element::findByPath('1/0/4/0/4', $cms);
+            $signatureAlgorithmIdentifier = Asn1Element::findByPath('1/0/4/0/4', $cms);
             $signatureAlgorithmIdentifier->getChild(0)->setValue(
-                SetaPDF_Signer_Asn1_Oid::encode("1.2.840.113549.1.1.10")
+                Asn1Oid::encode("1.2.840.113549.1.1.10")
             );
             $signatureAlgorithmIdentifier->removeChild($signatureAlgorithmIdentifier->getChild(1));
-            $signatureAlgorithmIdentifier->addChild(new SetaPDF_Signer_Asn1_Element(
-                SetaPDF_Signer_Asn1_Element::SEQUENCE | SetaPDF_Signer_Asn1_Element::IS_CONSTRUCTED,
+            $signatureAlgorithmIdentifier->addChild(new Asn1Element(
+                Asn1Element::SEQUENCE | Asn1Element::IS_CONSTRUCTED,
                 '',
                 [
-                    new SetaPDF_Signer_Asn1_Element(
-                        SetaPDF_Signer_Asn1_Element::TAG_CLASS_CONTEXT_SPECIFIC
-                        | SetaPDF_Signer_Asn1_Element::IS_CONSTRUCTED,
+                    new Asn1Element(
+                        Asn1Element::TAG_CLASS_CONTEXT_SPECIFIC | Asn1Element::IS_CONSTRUCTED,
                         '',
                         [
-                            new SetaPDF_Signer_Asn1_Element(
-                                SetaPDF_Signer_Asn1_Element::SEQUENCE
-                                | SetaPDF_Signer_Asn1_Element::IS_CONSTRUCTED,
+                            new Asn1Element(
+                                Asn1Element::SEQUENCE | Asn1Element::IS_CONSTRUCTED,
                                 '',
                                 [
-                                    new SetaPDF_Signer_Asn1_Element(
-                                        SetaPDF_Signer_Asn1_Element::OBJECT_IDENTIFIER,
-                                        SetaPDF_Signer_Asn1_Oid::encode(Digest::getOid($this->padesModule->getDigest()))
+                                    new Asn1Element(
+                                        Asn1Element::OBJECT_IDENTIFIER,
+                                        Asn1Oid::encode(Digest::getOid($this->padesModule->getDigest()))
                                     ),
-                                    new SetaPDF_Signer_Asn1_Element(SetaPDF_Signer_Asn1_Element::NULL)
+                                    new Asn1Element(Asn1Element::NULL)
                                 ]
                             )
                         ]
                     ),
-                    new SetaPDF_Signer_Asn1_Element(
-                        SetaPDF_Signer_Asn1_Element::TAG_CLASS_CONTEXT_SPECIFIC
-                        | SetaPDF_Signer_Asn1_Element::IS_CONSTRUCTED
-                        | "\x01",
+                    new Asn1Element(
+                        Asn1Element::TAG_CLASS_CONTEXT_SPECIFIC | Asn1Element::IS_CONSTRUCTED | "\x01",
                         '',
                         [
-                            new SetaPDF_Signer_Asn1_Element(
-                                SetaPDF_Signer_Asn1_Element::SEQUENCE
-                                | SetaPDF_Signer_Asn1_Element::IS_CONSTRUCTED,
+                            new Asn1Element(
+                                Asn1Element::SEQUENCE | Asn1Element::IS_CONSTRUCTED,
                                 '',
                                 [
-                                    new SetaPDF_Signer_Asn1_Element(
-                                        SetaPDF_Signer_Asn1_Element::OBJECT_IDENTIFIER,
-                                        SetaPDF_Signer_Asn1_Oid::encode('1.2.840.113549.1.1.8')
+                                    new Asn1Element(
+                                        Asn1Element::OBJECT_IDENTIFIER,
+                                        Asn1Oid::encode('1.2.840.113549.1.1.8')
                                     ),
-                                    new SetaPDF_Signer_Asn1_Element(
-                                        SetaPDF_Signer_Asn1_Element::SEQUENCE
-                                        | SetaPDF_Signer_Asn1_Element::IS_CONSTRUCTED,
+                                    new Asn1Element(
+                                        Asn1Element::SEQUENCE | Asn1Element::IS_CONSTRUCTED,
                                         '',
                                         [
-                                            new SetaPDF_Signer_Asn1_Element(
-                                                SetaPDF_Signer_Asn1_Element::OBJECT_IDENTIFIER,
-                                                SetaPDF_Signer_Asn1_Oid::encode(Digest::getOid(
+                                            new Asn1Element(
+                                                Asn1Element::OBJECT_IDENTIFIER,
+                                                Asn1Oid::encode(Digest::getOid(
                                                     $this->padesModule->getDigest()
                                                 ))
                                             ),
-                                            new SetaPDF_Signer_Asn1_Element(SetaPDF_Signer_Asn1_Element::NULL)
+                                            new Asn1Element(Asn1Element::NULL)
                                         ]
                                     )
                                 ]
@@ -538,12 +533,12 @@ class Module implements
                 $r = "\0" . $r;
             }
 
-            $signatureValue = new SetaPDF_Signer_Asn1_Element(
-                SetaPDF_Signer_Asn1_Element::SEQUENCE | SetaPDF_Signer_Asn1_Element::IS_CONSTRUCTED,
+            $signatureValue = new Asn1Element(
+                Asn1Element::SEQUENCE | Asn1Element::IS_CONSTRUCTED,
                 '',
                 [
-                    new SetaPDF_Signer_Asn1_Element(SetaPDF_Signer_Asn1_Element::INTEGER, $s),
-                    new SetaPDF_Signer_Asn1_Element(SetaPDF_Signer_Asn1_Element::INTEGER, $r),
+                    new Asn1Element(Asn1Element::INTEGER, $s),
+                    new Asn1Element(Asn1Element::INTEGER, $r),
                 ]
             );
         }
@@ -556,7 +551,7 @@ class Module implements
     /**
      * @inheritDoc
      */
-    public function updateSignatureDictionary(SetaPDF_Core_Type_Dictionary $dictionary)
+    public function updateSignatureDictionary(Dictionary $dictionary)
     {
         $this->padesModule->updateSignatureDictionary($dictionary);
     }
@@ -564,7 +559,7 @@ class Module implements
     /**
      * @inheritDoc
      */
-    public function updateDocument(SetaPDF_Core_Document $document)
+    public function updateDocument(Document $document)
     {
         $this->padesModule->updateDocument($document);
     }
@@ -572,7 +567,7 @@ class Module implements
     /**
      * Get the complete Cryptographic Message Syntax structure.
      *
-     * @return SetaPDF_Signer_Asn1_Element
+     * @return Asn1Element
      * @throws SetaPDF_Signer_Exception
      */
     public function getCms()

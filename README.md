@@ -1,7 +1,7 @@
-#  SetaPDF-Signer component modules for the Azure Key Vault service.
+#  SetaPDF-Signer component modules for the Azure Key Vault.
 
-This package offers modules for the [SetaPDF-Signer](https://www.setasign.com/signer) component that allow you to use
-the [Azure Key Vault service](https://azure.microsoft.com/services/key-vault/) by 
+This package offers module for the [SetaPDF-Signer](https://www.setasign.com/signer) component that allow you to use
+the [Azure Key Vault](https://azure.microsoft.com/services/key-vault/) by 
 [Microsoft](https://www.microsoft.com) to **digital sign PDF documents in pure PHP**.
 
 ## Requirements
@@ -72,7 +72,17 @@ component. If you want to use it with an evaluation version please use following
 
 ### Without Composer
 
-Make sure, that the [SetaPDF-Signer](https://www.setasign.com/signer) component 
+It's recommend to use composer otherwise you have to resolve the depency tree manually. You will require:
+
+- [SetaPDF-Signer component](https://www.setasign.com/signer)
+- [PSR-7 interfaces](https://github.com/php-fig/http-message)
+- [PSR-17 interfaces](https://github.com/php-fig/http-factory)
+- [PSR-18 interfaces](https://github.com/php-fig/http-client)
+- PSR-7 implementation like [Guzzle PSR-7](https://github.com/guzzle/psr7)
+- PSR-17 implementation like [HTTP Factory for Guzzle](https://github.com/http-interop/http-factory-guzzle)
+- PSR-18 implementation like [Guzzle](https://github.com/guzzle/guzzle) (version 6 requires an [additional wrapper](https://github.com/mjelamanov/psr18-guzzle))
+
+Make sure, that the [SetaPDF-Signer component](https://www.setasign.com/signer)
 is [installed](https://manuals.setasign.com/setapdf-core-manual/installation/#index-2) and
 its [autoloader is registered](https://manuals.setasign.com/setapdf-core-manual/getting-started/#index-1) correctly.
 
@@ -93,19 +103,23 @@ All classes in this package are located in the namespace `setasign\SetaPDF\Signe
 This is the main signature module which can be used with the [SetaPDF-Signer](https://www.setasign.com/signer)
 component. Its constructor requires 6 arguments:
 
-`$vaultBaseUrl` The base url of your key vault.
-`$certificateName` The name of your key.
-`$certificateVersion` The version of your key.
-`$httpClient` PSR-18 HTTP Client implementation.
-`$requestFactory` PSR-17 HTTP Factory implementation.
-`$streamFactory` PSR-17 HTTP Factory implementation.
+- `$vaultBaseUrl` The base url of your key vault.
+- `$certificateName` The name of your key.
+- `$certificateVersion` The version of your key.
+- `$httpClient` PSR-18 HTTP Client implementation.
+- `$requestFactory` PSR-17 HTTP Factory implementation.
+- `$streamFactory` PSR-17 HTTP Factory implementation.
+
 A simple complete signature process would look like this:
 
 ```php
-$httpClient = new Mjelamanov\GuzzlePsr18\Client(new GuzzleHttp\Client([
+$httpClient = new GuzzleHttp\Client([
     'http_errors' => false,
     //'verify' => './cert.pem'
-]));
+]);
+// if you are using php 7.0 or 7.1
+//$httpClient = new Mjelamanov\GuzzlePsr18\Client($httpClient);
+
 $azureModule = new setasign\SetaPDF\Signer\Module\AzureKeyVault\Module(
     $vaultBaseUrl,
     $certificateName,

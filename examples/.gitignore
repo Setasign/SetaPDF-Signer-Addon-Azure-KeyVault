@@ -1,4 +1,5 @@
 /settings.php
-/cert.pem
+/cacert.pem
 /token
 /signed.pdf
+/cer.crt
