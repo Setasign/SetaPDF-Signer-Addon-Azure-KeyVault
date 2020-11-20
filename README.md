@@ -115,7 +115,7 @@ A simple complete signature process would look like this:
 ```php
 $httpClient = new GuzzleHttp\Client([
     'http_errors' => false,
-    //'verify' => './cert.pem'
+    //'verify' => './cacert.pem'
 ]);
 // if you are using php 7.0 or 7.1
 //$httpClient = new Mjelamanov\GuzzlePsr18\Client($httpClient);
