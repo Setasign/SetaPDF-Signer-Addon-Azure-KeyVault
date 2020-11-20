@@ -43,11 +43,11 @@ $token = $azureModule->createTokenBySharedSecret($tenantId, $appClientId, $appCl
 // alternativly you can remember you last access token
 // this is a simple example using the file system. redis or memcache may be a better solution
 //if (file_exists(__DIR__ . '/token')) {
-//    $token = unserialize(file_get_contents(__DIR__ . '/token'), ['allowed_classes' => false]);
+//    $token = json_decode(file_get_contents(__DIR__ . '/token'), true);
 //}
 //if (!isset($token, $token['accessToken'], $token['expires']) || $token['expires'] < (time() - 60)) {
 //    $token = $azureModule->createTokenBySharedSecret($tenantId, $appClientId, $appClientSecret);
-//    file_put_contents(__DIR__ . '/token', serialize($token));
+//    file_put_contents(__DIR__ . '/token', json_encode($token, JSON_PRETTY_PRINT));
 //}
 $azureModule->setAccessToken($token['accessToken']);
 
