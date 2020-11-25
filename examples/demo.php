@@ -20,9 +20,6 @@ $certificateVersion = $settings['certificateVersion'];
 $digest = isset($settings['digest']) ? $settings['digest'] : null;
 $alg = isset($settings['alg']) ? $settings['alg'] : null;
 
-$fileToSign = __DIR__ . '/assets/Laboratory-Report.pdf';
-$resultPath = 'signed.pdf';
-
 $guzzleOptions = ['http_errors' => false];
 if (file_exists(__DIR__ . '/cacert.pem')) {
     $guzzleOptions['verify'] = __DIR__ . '/cacert.pem';
@@ -64,8 +61,11 @@ $azureModule->setAccessToken($token['accessToken']);
 //}
 //$azureModule->setCertificate($cert);
 
+// the file to sign
+$fileToSign = __DIR__ . '/Laboratory-Report.pdf';
+
 // create a writer instance
-$writer = new SetaPDF_Core_Writer_File($resultPath);
+$writer = new SetaPDF_Core_Writer_File('signed.pdf');
 // create the document instance
 $document = SetaPDF_Core_Document::loadByFilename($fileToSign, $writer);
 
