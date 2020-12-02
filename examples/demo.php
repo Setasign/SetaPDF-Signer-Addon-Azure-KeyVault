@@ -50,7 +50,7 @@ $token = $azureModule->createTokenBySharedSecret($tenantId, $appClientId, $appCl
 //}
 //if (!isset($token, $token['accessToken'], $token['expires']) || $token['expires'] < (time() - 60)) {
 //    $token = $azureModule->createTokenBySharedSecret($tenantId, $appClientId, $appClientSecret);
-//    file_put_contents(__DIR__ . '/token', json_encode($token, JSON_PRETTY_PRINT));
+//    file_put_contents(__DIR__ . '/token', json_encode($token, JSON_PRETTY_PRINT), LOCK_EX);
 //}
 $azureModule->setAccessToken($token['accessToken']);
 
