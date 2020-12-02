@@ -70,7 +70,7 @@ $azureModule->setAccessToken($token['accessToken']);
 $certificate = SetaPDF_Signer_X509_Certificate::fromFile($certificatePath);
 $azureModule->setCertificate($certificate);
 
-// Create a collection of trusted certificats:
+// create a collection of trusted certificats:
 $trustedCertificates = new SetaPDF_Signer_X509_Collection(
     SetaPDF_Signer_Pem::extractFromFile($trustedCertificatesPath)
 );
@@ -131,7 +131,7 @@ $collector = new SetaPDF_Signer_ValidationRelatedInfo_Collector($trustedCertific
 // get VRI for the timestamp signature
 $vriData = $collector->getByFieldName(
     $document,
-    'Signature', //$signatureField->getQualifiedName(),
+    $signatureField->getQualifiedName(),
     SetaPDF_Signer_ValidationRelatedInfo_Collector::SOURCE_OCSP_OR_CRL,
     null,
     null,
