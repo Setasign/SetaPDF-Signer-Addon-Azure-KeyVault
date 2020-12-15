@@ -1,6 +1,6 @@
-#  SetaPDF-Signer component modules for the Azure Key Vault.
+#  SetaPDF-Signer component module for the Azure Key Vault.
 
-This package offers module for the [SetaPDF-Signer](https://www.setasign.com/signer) component that allow you to use
+This package offers a module for the [SetaPDF-Signer](https://www.setasign.com/signer) component that allow you to use
 the [Azure Key Vault](https://azure.microsoft.com/services/key-vault/) by 
 [Microsoft](https://www.microsoft.com) to **digital sign PDF documents in pure PHP**.
 
