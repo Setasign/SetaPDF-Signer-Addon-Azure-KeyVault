@@ -484,6 +484,16 @@ class Module implements
 
         // update CMS SignatureAlgorithmIdentifier according to Probabilistic Signature Scheme (RSASSA-PSS)
         if (\in_array($signatureAlgorithm, ['PS256', 'PS384', 'PS512'], true)) {
+            // Here https://docs.microsoft.com/en-us/rest/api/keyvault/sign/sign#jsonwebkeysignaturealgorithm
+            // the algorihms are linked to https://tools.ietf.org/html/rfc7518#section-3.5 which says:
+            // "The size of the salt value is the same size as the hash function output."
+            $saltLength = 256 / 8;
+            if ($signatureAlgorithm === 'PS384') {
+                $saltLength = 384 / 8;
+            } elseif ($signatureAlgorithm === 'PS512') {
+                $saltLength = 512 / 8;
+            }
+
             $cms = $this->padesModule->getCms();
 
             $signatureAlgorithmIdentifier = Asn1Element::findByPath('1/0/4/0/4', $cms);
@@ -541,6 +551,12 @@ class Module implements
                             )
                         ]
                     ),
+                    new Asn1Element(
+                        Asn1Element::TAG_CLASS_CONTEXT_SPECIFIC | Asn1Element::IS_CONSTRUCTED | "\x02", '',
+                        [
+                            new Asn1Element(Asn1Element::INTEGER, \chr($saltLength))
+                        ]
+                    )
                 ]
             ));
         }
