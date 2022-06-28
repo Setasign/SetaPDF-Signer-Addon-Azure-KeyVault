@@ -1,4 +1,5 @@
 /settings.php
+/settings-*.php
 /cacert.pem
 /token
 /signed.pdf
