@@ -159,13 +159,7 @@ class Module implements
      */
     public function findSignatureAlgorithm(): string
     {
-        // ensure certificate
-        $certificate = $this->padesModule->getCertificate();
-        if ($certificate === null) {
-            $certificate = $this->fetchCertificate();
-            $this->padesModule->setCertificate($certificate);
-        }
-
+        $certificate = $this->getCertificate();
         if (!$certificate instanceof SetaPDF_Signer_X509_Certificate) {
             $certificate = SetaPDF_Signer_X509_Certificate::fromFileOrString($certificate);
         }
@@ -431,6 +425,20 @@ class Module implements
     }
 
     /**
+     * @return mixed|string
+     */
+    public function getCertificate()
+    {
+        $certificate = $this->padesModule->getCertificate();
+        if ($certificate === null) {
+            $certificate = $this->fetchCertificate();
+            $this->padesModule->setCertificate($certificate);
+        }
+
+        return $certificate;
+    }
+
+    /**
      * Add additional certificates which are placed into the CMS structure.
      *
      * @param array|\SetaPDF_Signer_X509_Collection $extraCertificates PEM encoded certificates or pathes to PEM encoded
@@ -469,11 +477,7 @@ class Module implements
     public function createSignature(FilePath $tmpPath)
     {
         // ensure certificate
-        $certificate = $this->padesModule->getCertificate();
-        if ($certificate === null) {
-            $certificate = $this->fetchCertificate();
-            $this->padesModule->setCertificate($certificate);
-        }
+        $this->getCertificate();
 
         // ensure signature algorithm and pades digest
         $signatureAlgorithm = $this->getSignatureAlgorithm();
