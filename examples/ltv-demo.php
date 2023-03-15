@@ -24,8 +24,7 @@ $appClientSecret = $settings['appClientSecret'];
 $vaultBaseUrl = $settings['vaultBaseUrl'];
 $certificateName = $settings['certificateName'];
 $certificateVersion = $settings['certificateVersion'];
-$digest = isset($settings['digest']) ? $settings['digest'] : null;
-$alg = isset($settings['alg']) ? $settings['alg'] : null;
+$alg = $settings['alg'];
 
 $certificatePath = __DIR__ . '/assets/setapdf_demos@setasign_com.crt';
 $trustedCertificatesPath = __DIR__ . '/assets/setapdf_demos@setasign_com.ca-bundle';
@@ -99,12 +98,7 @@ $document = SetaPDF_Core_Document::loadByFilename($fileToSign, $tmpWriter);
 $signer = new SetaPDF_Signer($document);
 // because of the timestamp and VRI data we need more space for the signature container
 $signer->setSignatureContentLength(25500);
-if ($digest !== null) {
-    $azureModule->setDigest($digest);
-}
-if ($alg !== null) {
-    $azureModule->setSignatureAlgorithm($alg);
-}
+$azureModule->setSignatureAlgorithm($alg);
 
 // setup a timestamp module
 $tsModule = new SetaPDF_Signer_Timestamp_Module_Rfc3161_Curl($timestampingUrl);

@@ -14,17 +14,16 @@ use Psr\Http\Client\ClientExceptionInterface;
 use Psr\Http\Client\ClientInterface;
 use Psr\Http\Message\RequestFactoryInterface;
 use Psr\Http\Message\StreamFactoryInterface;
-use SetaPDF_Core_Document as Document;
 use SetaPDF_Core_Reader_FilePath as FilePath;
-use SetaPDF_Core_Type_Dictionary as Dictionary;
 use SetaPDF_Signer_Asn1_Element as Asn1Element;
+use SetaPDF_Signer_Asn1_Exception;
 use SetaPDF_Signer_Asn1_Oid as Asn1Oid;
 use SetaPDF_Signer_Digest as Digest;
 use SetaPDF_Signer_Exception;
 use SetaPDF_Signer_Signature_DictionaryInterface;
 use SetaPDF_Signer_Signature_DocumentInterface;
 use SetaPDF_Signer_Signature_Module_ModuleInterface;
-use SetaPDF_Signer_Signature_Module_Pades;
+use SetaPDF_Signer_Signature_Module_PadesProxyTrait;
 use SetaPDF_Signer_X509_Certificate;
 
 /**
@@ -35,6 +34,8 @@ class Module implements
     SetaPDF_Signer_Signature_DictionaryInterface,
     SetaPDF_Signer_Signature_DocumentInterface
 {
+    use SetaPDF_Signer_Signature_Module_PadesProxyTrait;
+
     /**
      * @var string The base url of your key vault.
      */
@@ -66,11 +67,6 @@ class Module implements
     protected $streamFactory;
 
     /**
-     * @var SetaPDF_Signer_Signature_Module_Pades Internal pades module.
-     */
-    protected $padesModule;
-
-    /**
      * @var null|string Active access token.
      */
     protected $accessToken;
@@ -98,45 +94,48 @@ class Module implements
         RequestFactoryInterface $requestFactory,
         StreamFactoryInterface $streamFactory
     ) {
-        $this->vaultBaseUrl = (string) $vaultBaseUrl;
-        $this->certificateName = (string) $certificateName;
-        $this->certificateVersion = (string) $certificateVersion;
+        $this->vaultBaseUrl = $vaultBaseUrl;
+        $this->certificateName = $certificateName;
+        $this->certificateVersion = $certificateVersion;
         $this->httpClient = $httpClient;
         $this->requestFactory = $requestFactory;
         $this->streamFactory = $streamFactory;
-        $this->padesModule = new SetaPDF_Signer_Signature_Module_Pades();
-    }
-
-    /**
-     * Set the digest algorithm to use when signing.
-     *
-     * @param string $digest Allowed values are sha256, sha386, sha512
-     * @see SetaPDF_Signer_Signature_Module_Pades::setDigest()
-     */
-    public function setDigest(string $digest)
-    {
-        $this->padesModule->setDigest($digest);
-    }
-
-    /**
-     * Get the digest algorithm.
-     *
-     * @return string
-     */
-    public function getDigest(): string
-    {
-        return $this->padesModule->getDigest();
     }
 
     /**
      * Enforce the used signature algorithm.
      *
      * @param string $algorithm See azure documentation for the available options.
-     * @see https://docs.microsoft.com/de-de/rest/api/keyvault/sign/sign
+     * @see https://learn.microsoft.com/en-us/rest/api/keyvault/keys/sign/sign?tabs=HTTP#jsonwebkeysignaturealgorithm
      */
     public function setSignatureAlgorithm(string $algorithm)
     {
+        switch ($algorithm) {
+            case 'ES256':
+            case 'ES256K':
+            case 'PS256':
+            case 'RS256':
+                $digest = Digest::SHA_256;
+                break;
+            case 'ES384':
+            case 'PS384':
+            case 'RS384':
+                $digest = Digest::SHA_384;
+                break;
+            case 'ES512':
+            case 'PS512':
+            case 'RS512':
+                $digest = Digest::SHA_512;
+                break;
+            default:
+                throw new InvalidArgumentException(\sprintf(
+                    'Unknown signature algorithm "%s".',
+                    $algorithm
+                ));
+        }
+
         $this->signatureAlgorithm = $algorithm;
+        $this->_getPadesModule()->setDigest($digest);
     }
 
     /**
@@ -144,69 +143,9 @@ class Module implements
      *
      * @return string|null
      */
-    public function getSignatureAlgorithm()
+    public function getSignatureAlgorithm(): ?string
     {
         return $this->signatureAlgorithm;
-    }
-
-    /**
-     * Search for the matching signature algorithm in the used certificate.
-     *
-     * Note: if the certificate isn't set yet it will be fetched first.
-     *
-     * @return string
-     * @throws SetaPDF_Signer_Exception
-     */
-    public function findSignatureAlgorithm(): string
-    {
-        $certificate = $this->getCertificate();
-        if (!$certificate instanceof SetaPDF_Signer_X509_Certificate) {
-            $certificate = SetaPDF_Signer_X509_Certificate::fromFileOrString($certificate);
-        }
-
-        $signAlgorithmOid = $certificate->getSubjectPublicKeyInfoAlgorithmIdentifier()[0];
-        if (!isset(Digest::$algorithmOids[$signAlgorithmOid])) {
-            throw new Exception(\sprintf('Unknown algorithm "%s".', $signAlgorithmOid));
-        }
-
-        $signAlgorithm = Digest::$algorithmOids[$signAlgorithmOid];
-        $padesDigest = $this->padesModule->getDigest();
-
-        switch ($signAlgorithm) {
-            case Digest::RSA_PSS_ALGORITHM:
-                switch ($padesDigest) {
-                    case Digest::SHA_256:
-                        return 'PS256';
-                    case Digest::SHA_384:
-                        return 'PS384';
-                    case Digest::SHA_512:
-                        return 'PS512';
-                }
-                throw new Exception(\sprintf('Unknown pades digest "%s".', $padesDigest));
-
-            case Digest::RSA_ALGORITHM:
-                switch ($padesDigest) {
-                    case Digest::SHA_256:
-                        return 'RS256';
-                    case Digest::SHA_384:
-                        return 'RS384';
-                    case Digest::SHA_512:
-                        return 'RS512';
-                }
-                throw new Exception(\sprintf('Unknown pades digest "%s".', $padesDigest));
-
-            case Digest::ECDSA_ALGORITHM:
-                switch ($padesDigest) {
-                    case Digest::SHA_256:
-                        return 'ES256';
-                    case Digest::SHA_384:
-                        return 'ES384';
-                    case Digest::SHA_512:
-                        return 'ES512';
-                }
-                throw new Exception(\sprintf('Unknown pades digest "%s".', $padesDigest));
-        }
-        throw new Exception(\sprintf('Unknown sign algorithm "%s".', $signAlgorithm));
     }
 
     /**
@@ -224,7 +163,7 @@ class Module implements
      * @return string
      * @see https://tools.ietf.org/html/rfc4648#section-5
      */
-    protected function base64url_encode(string $data)
+    protected function base64url_encode(string $data): string
     {
         return rtrim(strtr(base64_encode($data), '+/', '-_'), '=');
     }
@@ -334,8 +273,8 @@ class Module implements
      *
      * @return SetaPDF_Signer_X509_Certificate The certificate from the azure key vault.
      * @throws Exception
-     * @throws \SetaPDF_Signer_Asn1_Exception
-     * @see https://docs.microsoft.com/de-de/rest/api/keyvault/getcertificate/getcertificate
+     * @throws SetaPDF_Signer_Asn1_Exception
+     * @see https://learn.microsoft.com/en-us/rest/api/keyvault/certificates/get-certificate-issuers/get-certificate-issuers?tabs=HTTP
      */
     public function fetchCertificate(): SetaPDF_Signer_X509_Certificate
     {
@@ -377,7 +316,7 @@ class Module implements
      * @param string $digest
      * @return string
      * @throws SetaPDF_Signer_Exception
-     * @see https://docs.microsoft.com/de-de/rest/api/keyvault/sign/sign
+     * @see https://learn.microsoft.com/en-us/rest/api/keyvault/keys/sign/sign?tabs=HTTP
      */
     protected function sign(string $digest): string
     {
@@ -416,63 +355,28 @@ class Module implements
     }
 
     /**
-     * @param $certificate
-     * @throws \SetaPDF_Signer_Asn1_Exception
-     */
-    public function setCertificate($certificate)
-    {
-        $this->padesModule->setCertificate($certificate);
-    }
-
-    /**
-     * @return mixed|string
+     * @return SetaPDF_Signer_X509_Certificate|string
+     * @throws Exception
+     * @throws SetaPDF_Signer_Asn1_Exception
      */
     public function getCertificate()
     {
-        $certificate = $this->padesModule->getCertificate();
+        $module = $this->_getPadesModule();
+
+        $certificate = $module->getCertificate();
         if ($certificate === null) {
             $certificate = $this->fetchCertificate();
-            $this->padesModule->setCertificate($certificate);
+            $module->setCertificate($certificate);
         }
 
         return $certificate;
     }
 
     /**
-     * Add additional certificates which are placed into the CMS structure.
-     *
-     * @param array|\SetaPDF_Signer_X509_Collection $extraCertificates PEM encoded certificates or pathes to PEM encoded
-     *                                                                 certificates.
-     * @throws \SetaPDF_Signer_Asn1_Exception
-     */
-    public function setExtraCertificates($extraCertificates)
-    {
-        $this->padesModule->setExtraCertificates($extraCertificates);
-    }
-
-    /**
-     * Adds an OCSP response which will be embedded in the CMS structure.
-     *
-     * @param string|\SetaPDF_Signer_Ocsp_Response $ocspResponse DER encoded OCSP response or OCSP response instance.
-     * @throws SetaPDF_Signer_Exception
-     */
-    public function addOcspResponse($ocspResponse)
-    {
-        $this->padesModule->addOcspResponse($ocspResponse);
-    }
-
-    /**
-     * Adds an CRL which will be embedded in the CMS structure.
-     *
-     * @param string|\SetaPDF_Signer_X509_Crl $crl
-     */
-    public function addCrl($crl)
-    {
-        $this->padesModule->addCrl($crl);
-    }
-
-    /**
      * @inheritDoc
+     * @throws Exception
+     * @throws SetaPDF_Signer_Exception
+     * @throws SetaPDF_Signer_Asn1_Exception
      */
     public function createSignature(FilePath $tmpPath)
     {
@@ -482,9 +386,10 @@ class Module implements
         // ensure signature algorithm and pades digest
         $signatureAlgorithm = $this->getSignatureAlgorithm();
         if ($signatureAlgorithm === null) {
-            $signatureAlgorithm = $this->findSignatureAlgorithm();
-            $this->setSignatureAlgorithm($signatureAlgorithm);
+            throw new Exception('Missing signature algorithm! You should call Module::setSignatureAlgorithm() first.');
         }
+
+        $module = $this->_getPadesModule();
 
         // update CMS SignatureAlgorithmIdentifier according to Probabilistic Signature Scheme (RSASSA-PSS)
         if (\in_array($signatureAlgorithm, ['PS256', 'PS384', 'PS512'], true)) {
@@ -498,7 +403,7 @@ class Module implements
                 $saltLength = 512 / 8;
             }
 
-            $cms = $this->padesModule->getCms();
+            $cms = $module->getCms();
 
             $signatureAlgorithmIdentifier = Asn1Element::findByPath('1/0/4/0/4', $cms);
             $signatureAlgorithmIdentifier->getChild(0)->setValue(
@@ -519,7 +424,7 @@ class Module implements
                                 [
                                     new Asn1Element(
                                         Asn1Element::OBJECT_IDENTIFIER,
-                                        Asn1Oid::encode(Digest::getOid($this->padesModule->getDigest()))
+                                        Asn1Oid::encode(Digest::getOid($module->getDigest()))
                                     ),
                                     new Asn1Element(Asn1Element::NULL)
                                 ]
@@ -545,7 +450,7 @@ class Module implements
                                             new Asn1Element(
                                                 Asn1Element::OBJECT_IDENTIFIER,
                                                 Asn1Oid::encode(Digest::getOid(
-                                                    $this->padesModule->getDigest()
+                                                    $module->getDigest()
                                                 ))
                                             ),
                                             new Asn1Element(Asn1Element::NULL)
@@ -566,8 +471,8 @@ class Module implements
         }
 
         // get the hash data from the module
-        $hashData = $this->padesModule->getDataToSign($tmpPath);
-        $padesDigest = $this->padesModule->getDigest();
+        $hashData = $module->getDataToSign($tmpPath);
+        $padesDigest = $module->getDigest();
 
         $digest = $this->base64url_encode(hash($padesDigest, $hashData, true));
         $signatureResponse = $this->sign($digest);
@@ -597,34 +502,7 @@ class Module implements
         }
 
         // pass it to the module
-        $this->padesModule->setSignatureValue((string)$signatureValue);
-        return (string) $this->padesModule->getCms();
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function updateSignatureDictionary(Dictionary $dictionary)
-    {
-        $this->padesModule->updateSignatureDictionary($dictionary);
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function updateDocument(Document $document)
-    {
-        $this->padesModule->updateDocument($document);
-    }
-
-    /**
-     * Get the complete Cryptographic Message Syntax structure.
-     *
-     * @return Asn1Element
-     * @throws SetaPDF_Signer_Exception
-     */
-    public function getCms()
-    {
-        return $this->padesModule->getCms();
+        $module->setSignatureValue((string)$signatureValue);
+        return (string) $module->getCms();
     }
 }

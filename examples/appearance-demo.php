@@ -17,8 +17,7 @@ $appClientSecret = $settings['appClientSecret'];
 $vaultBaseUrl = $settings['vaultBaseUrl'];
 $certificateName = $settings['certificateName'];
 $certificateVersion = $settings['certificateVersion'];
-$digest = isset($settings['digest']) ? $settings['digest'] : null;
-$alg = isset($settings['alg']) ? $settings['alg'] : null;
+$alg = $settings['alg'];
 
 $fileToSign = __DIR__ . '/assets/Laboratory-Report.pdf';
 $resultPath = 'signed.pdf';
@@ -71,12 +70,8 @@ $document = SetaPDF_Core_Document::loadByFilename($fileToSign, $writer);
 
 // create the signer instance
 $signer = new SetaPDF_Signer($document);
-if ($digest !== null) {
-    $azureModule->setDigest($digest);
-}
-if ($alg !== null) {
-    $azureModule->setSignatureAlgorithm($alg);
-}
+
+$azureModule->setSignatureAlgorithm($alg);
 
 $field = $signer->addSignatureField(
     'Signature',
@@ -90,6 +85,7 @@ $field = $signer->addSignatureField(
 $signer->setSignatureFieldName($field->getQualifiedName());
 
 $appearance = new SetaPDF_Signer_Signature_Appearance_Dynamic($azureModule);
+
 $signer->setAppearance($appearance);
 
 $signer->sign($azureModule);
