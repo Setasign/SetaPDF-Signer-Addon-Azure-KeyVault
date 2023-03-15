@@ -124,12 +124,7 @@ $document = SetaPDF_Core_Document::loadByFilename($fileToSign, $writer);
 
 // create the signer instance
 $signer = new SetaPDF_Signer($document);
-if ($digest !== null) {
-    $azureModule->setDigest($digest);
-}
-if ($alg !== null) {
-    $azureModule->setSignatureAlgorithm($alg);
-}
+$azureModule->setSignatureAlgorithm($alg);
 $signer->sign($azureModule);
 ```
 
