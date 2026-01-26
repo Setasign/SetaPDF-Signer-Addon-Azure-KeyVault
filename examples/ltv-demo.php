@@ -10,10 +10,18 @@
 declare(strict_types=1);
 
 use GuzzleHttp\Client as GuzzleClient;
-use Mjelamanov\GuzzlePsr18\Client as Psr18Wrapper;
 use Http\Factory\Guzzle\RequestFactory;
 use Http\Factory\Guzzle\StreamFactory;
 use setasign\SetaPDF\Signer\Module\AzureKeyVault\Module as AzureKeyVaultModule;
+use setasign\SetaPDF2\Core\Document;
+use setasign\SetaPDF2\Core\Writer\FileWriter;
+use setasign\SetaPDF2\Core\Writer\TempFileWriter;
+use setasign\SetaPDF2\Signer\DocumentSecurityStore;
+use setasign\SetaPDF2\Signer\PemHelper;
+use setasign\SetaPDF2\Signer\Signer;
+use setasign\SetaPDF2\Signer\Timestamp\Module\Rfc3161\Curl as CurlTimestampModule;
+use setasign\SetaPDF2\Signer\ValidationRelatedInfo\Collector;
+use setasign\SetaPDF2\Signer\X509\Collection;
 
 require_once __DIR__ . '/../vendor/autoload.php';
 
@@ -27,7 +35,10 @@ $certificateVersion = $settings['certificateVersion'];
 $alg = $settings['alg'];
 
 $certificatePath = __DIR__ . '/assets/setapdf_demos@setasign_com.crt';
-$trustedCertificatesPath = __DIR__ . '/assets/setapdf_demos@setasign_com.ca-bundle';
+$trustedCertificatesPaths = [
+    __DIR__ . '/assets/globaltrust-all.pem',
+    __DIR__ . '/assets/USERTrust RSA Certification Authority.pem',
+];
 
 $timestampingUrl = 'http://timestamping.ensuredca.com';
 
@@ -39,15 +50,11 @@ if (file_exists(__DIR__ . '/cacert.pem')) {
     $guzzleOptions['verify'] = __DIR__ . '/cacert.pem';
 }
 
-$httpClient = new GuzzleClient($guzzleOptions);
-// only required if you are using guzzle < 7
-$httpClient = new Psr18Wrapper($httpClient);
-
 $azureModule = new AzureKeyVaultModule(
     $vaultBaseUrl,
     $certificateName,
     $certificateVersion,
-    $httpClient,
+    new GuzzleClient($guzzleOptions),
     new RequestFactory(),
     new StreamFactory()
 );
@@ -65,17 +72,18 @@ $token = $azureModule->createTokenBySharedSecret($tenantId, $appClientId, $appCl
 //}
 $azureModule->setAccessToken($token['accessToken']);
 
-// we use a local copy of the certificate
-$certificate = SetaPDF_Signer_X509_Certificate::fromFile($certificatePath);
+// THIS SHOULD BE REPLACED TO A LOCAL COPY OR CACHED TO AVOID API CALLS
+$certificate = $azureModule->fetchCertificate();
 $azureModule->setCertificate($certificate);
 
 // create a collection of trusted certificats:
-$trustedCertificates = new SetaPDF_Signer_X509_Collection(
-    SetaPDF_Signer_Pem::extractFromFile($trustedCertificatesPath)
-);
+$trustedCertificates = new Collection();
+foreach ($trustedCertificatesPaths as $trustedCertificatesPath) {
+    $trustedCertificates->add(PemHelper::extractFromFile($trustedCertificatesPath));
+}
 
 // create a collector instance
-$collector = new SetaPDF_Signer_ValidationRelatedInfo_Collector($trustedCertificates);
+$collector = new Collector($trustedCertificates);
 // collect revocation information for this certificate
 $vriData = $collector->getByCertificate($certificate);
 
@@ -89,19 +97,19 @@ foreach ($vriData->getCrls() as $crl) {
 }
 
 // create a writer instance
-$writer = new SetaPDF_Core_Writer_File($resultPath);
-$tmpWriter = new SetaPDF_Core_Writer_TempFile();
+$writer = new FileWriter($resultPath);
+$tmpWriter = new TempFileWriter();
 // create the document instance
-$document = SetaPDF_Core_Document::loadByFilename($fileToSign, $tmpWriter);
+$document = Document::loadByFilename($fileToSign, $tmpWriter);
 
 // create the signer instance
-$signer = new SetaPDF_Signer($document);
+$signer = new Signer($document);
 // because of the timestamp and VRI data we need more space for the signature container
-$signer->setSignatureContentLength(25500);
+$signer->setSignatureContentLength(46000);
 $azureModule->setSignatureAlgorithm($alg);
 
 // setup a timestamp module
-$tsModule = new SetaPDF_Signer_Timestamp_Module_Rfc3161_Curl($timestampingUrl);
+$tsModule = new CurlTimestampModule($timestampingUrl);
 $signer->setTimestampModule($tsModule);
 
 // add a signature field manually to get access to its name
@@ -113,10 +121,10 @@ $signer->setSignatureFieldName($signatureField->getQualifiedName());
 $signer->sign($azureModule);
 
 // create a new instance
-$document = SetaPDF_Core_Document::loadByFilename($tmpWriter->getPath(), $writer);
+$document = Document::loadByFilename($tmpWriter->getPath(), $writer);
 
 // create a VRI collector instance
-$collector = new SetaPDF_Signer_ValidationRelatedInfo_Collector($trustedCertificates);
+$collector = new Collector($trustedCertificates);
 // Use IPv4 to bypass an issue at http://ocsp.ensuredca.com
 //$collector->getOcspClient()->setCurlOption([
 //    CURLOPT_IPRESOLVE => CURL_IPRESOLVE_V4
@@ -126,7 +134,7 @@ $collector = new SetaPDF_Signer_ValidationRelatedInfo_Collector($trustedCertific
 $vriData = $collector->getByFieldName(
     $document,
     $signatureField->getQualifiedName(),
-    SetaPDF_Signer_ValidationRelatedInfo_Collector::SOURCE_OCSP_OR_CRL,
+    Collector::SOURCE_OCSP_OR_CRL,
     null,
     null,
     $vriData // pass the previously gathered VRI data
@@ -138,7 +146,7 @@ $vriData = $collector->getByFieldName(
 //}
 
 // and add it to the document.
-$dss = new SetaPDF_Signer_DocumentSecurityStore($document);
+$dss = new DocumentSecurityStore($document);
 $dss->addValidationRelatedInfoByFieldName(
     $signatureField->getQualifiedName(),
     $vriData->getCrls(),

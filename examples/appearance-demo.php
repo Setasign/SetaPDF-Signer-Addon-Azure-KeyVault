@@ -7,6 +7,11 @@ use Mjelamanov\GuzzlePsr18\Client as Psr18Wrapper;
 use Http\Factory\Guzzle\RequestFactory;
 use Http\Factory\Guzzle\StreamFactory;
 use setasign\SetaPDF\Signer\Module\AzureKeyVault\Module as AzureKeyVaultModule;
+use setasign\SetaPDF2\Core\Document;
+use setasign\SetaPDF2\Core\Writer\FileWriter;
+use setasign\SetaPDF2\Signer\Signature\Appearance\Dynamic as DynamicAppearance;
+use setasign\SetaPDF2\Signer\SignatureField;
+use setasign\SetaPDF2\Signer\Signer;
 
 require_once __DIR__ . '/../vendor/autoload.php';
 
@@ -64,19 +69,18 @@ $azureModule->setAccessToken($token['accessToken']);
 //$azureModule->setCertificate($cert);
 
 // create a writer instance
-$writer = new SetaPDF_Core_Writer_File($resultPath);
+$writer = new FileWriter($resultPath);
 // create the document instance
-$document = SetaPDF_Core_Document::loadByFilename($fileToSign, $writer);
+$document = Document::loadByFilename($fileToSign, $writer);
 
 // create the signer instance
-$signer = new SetaPDF_Signer($document);
-
+$signer = new Signer($document);
 $azureModule->setSignatureAlgorithm($alg);
 
 $field = $signer->addSignatureField(
     'Signature',
     1,
-    SetaPDF_Signer_SignatureField::POSITION_RIGHT_TOP,
+    SignatureField::POSITION_RIGHT_TOP,
     ['x' => -160, 'y' => -100],
     180,
     60
@@ -84,8 +88,7 @@ $field = $signer->addSignatureField(
 
 $signer->setSignatureFieldName($field->getQualifiedName());
 
-$appearance = new SetaPDF_Signer_Signature_Appearance_Dynamic($azureModule);
-
+$appearance = new DynamicAppearance($azureModule);
 $signer->setAppearance($appearance);
 
 $signer->sign($azureModule);

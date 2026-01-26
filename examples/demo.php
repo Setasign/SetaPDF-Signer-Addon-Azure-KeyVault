@@ -3,10 +3,12 @@
 declare(strict_types=1);
 
 use GuzzleHttp\Client as GuzzleClient;
-use Mjelamanov\GuzzlePsr18\Client as Psr18Wrapper;
 use Http\Factory\Guzzle\RequestFactory;
 use Http\Factory\Guzzle\StreamFactory;
 use setasign\SetaPDF\Signer\Module\AzureKeyVault\Module as AzureKeyVaultModule;
+use setasign\SetaPDF2\Core\Document;
+use setasign\SetaPDF2\Core\Writer\FileWriter;
+use setasign\SetaPDF2\Signer\Signer;
 
 require_once __DIR__ . '/../vendor/autoload.php';
 
@@ -27,15 +29,11 @@ if (file_exists(__DIR__ . '/cacert.pem')) {
     $guzzleOptions['verify'] = __DIR__ . '/cacert.pem';
 }
 
-$httpClient = new GuzzleClient($guzzleOptions);
-// only required if you are using guzzle < 7
-$httpClient = new Psr18Wrapper($httpClient);
-
 $azureModule = new AzureKeyVaultModule(
     $vaultBaseUrl,
     $certificateName,
     $certificateVersion,
-    $httpClient,
+    new GuzzleClient($guzzleOptions),
     new RequestFactory(),
     new StreamFactory()
 );
@@ -64,11 +62,11 @@ $azureModule->setAccessToken($token['accessToken']);
 //$azureModule->setCertificate($cert);
 
 // create a writer instance
-$writer = new SetaPDF_Core_Writer_File($resultPath);
+$writer = new FileWriter($resultPath);
 // create the document instance
-$document = SetaPDF_Core_Document::loadByFilename($fileToSign, $writer);
+$document = Document::loadByFilename($fileToSign, $writer);
 
 // create the signer instance
-$signer = new SetaPDF_Signer($document);
+$signer = new Signer($document);
 $azureModule->setSignatureAlgorithm($alg);
 $signer->sign($azureModule);

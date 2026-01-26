@@ -1,7 +1,7 @@
 <?php
 
 /**
- * @copyright Copyright (c) 2021 Setasign GmbH & Co. KG (https://www.setasign.com)
+ * @copyright Copyright (c) 2026 Setasign GmbH & Co. KG (https://www.setasign.com)
  * @license   http://opensource.org/licenses/mit-license The MIT License
  */
 
@@ -14,27 +14,26 @@ use Psr\Http\Client\ClientExceptionInterface;
 use Psr\Http\Client\ClientInterface;
 use Psr\Http\Message\RequestFactoryInterface;
 use Psr\Http\Message\StreamFactoryInterface;
-use SetaPDF_Core_Reader_FilePath as FilePath;
-use SetaPDF_Signer_Asn1_Element as Asn1Element;
-use SetaPDF_Signer_Asn1_Exception;
-use SetaPDF_Signer_Asn1_Oid as Asn1Oid;
-use SetaPDF_Signer_Digest as Digest;
-use SetaPDF_Signer_Exception;
-use SetaPDF_Signer_Signature_DictionaryInterface;
-use SetaPDF_Signer_Signature_DocumentInterface;
-use SetaPDF_Signer_Signature_Module_ModuleInterface;
-use SetaPDF_Signer_Signature_Module_PadesProxyTrait;
-use SetaPDF_Signer_X509_Certificate;
+use setasign\SetaPDF2\Core\Reader\FilePath;
+use setasign\SetaPDF2\Signer\Asn1\Element as Asn1Element;
+use setasign\SetaPDF2\Signer\Asn1\Exception as Asn1Exception;
+use setasign\SetaPDF2\Signer\Asn1\Oid as Asn1Oid;
+use setasign\SetaPDF2\Signer\Digest;
+use setasign\SetaPDF2\Signer\Signature\Module\DictionaryInterface;
+use setasign\SetaPDF2\Signer\Signature\Module\DocumentInterface;
+use setasign\SetaPDF2\Signer\Signature\Module\ModuleInterface;
+use setasign\SetaPDF2\Signer\Signature\Module\PadesProxyTrait;
+use setasign\SetaPDF2\Signer\X509\Certificate;
 
 /**
  * The signature module for the SetaPDF-Signer component
  */
 class Module implements
-    SetaPDF_Signer_Signature_Module_ModuleInterface,
-    SetaPDF_Signer_Signature_DictionaryInterface,
-    SetaPDF_Signer_Signature_DocumentInterface
+    ModuleInterface,
+    DictionaryInterface,
+    DocumentInterface
 {
-    use SetaPDF_Signer_Signature_Module_PadesProxyTrait;
+    use PadesProxyTrait;
 
     /**
      * @var string The base url of your key vault.
@@ -155,7 +154,7 @@ class Module implements
      */
     protected function base64url_decode(string $data)
     {
-        return base64_decode(strtr($data, '-_', '+/'));
+        return \base64_decode(\strtr($data, '-_', '+/'));
     }
 
     /**
@@ -163,9 +162,9 @@ class Module implements
      * @return string
      * @see https://tools.ietf.org/html/rfc4648#section-5
      */
-    protected function base64url_encode(string $data): string
+    protected function base64url_encode(string $data)
     {
-        return rtrim(strtr(base64_encode($data), '+/', '-_'), '=');
+        return \rtrim(\strtr(\base64_encode($data), '+/', '-_'), '=');
     }
 
     /**
@@ -226,7 +225,7 @@ class Module implements
                     'https://login.microsoftonline.com/' . $tenant . '/oauth2/v2.0/token'
                 )
                 ->withHeader('Content-Type', 'application/x-www-form-urlencoded')
-                ->withBody($this->streamFactory->createStream(http_build_query([
+                ->withBody($this->streamFactory->createStream(\http_build_query([
                     'scope' => $scope,
                     'grant_type' => 'client_credentials',
                     'client_id' => $appClientId,
@@ -252,7 +251,7 @@ class Module implements
 
         return [
             'accessToken' => $token['access_token'],
-            'expires' => time() + $token['expires_in']
+            'expires' => \time() + $token['expires_in']
         ];
     }
 
@@ -271,12 +270,12 @@ class Module implements
      *
      * You can use this to cache the certificate locally.
      *
-     * @return SetaPDF_Signer_X509_Certificate The certificate from the azure key vault.
+     * @return Certificate The certificate from the azure key vault.
+     * @throws Asn1Exception
      * @throws Exception
-     * @throws SetaPDF_Signer_Asn1_Exception
      * @see https://learn.microsoft.com/en-us/rest/api/keyvault/certificates/get-certificate-issuers/get-certificate-issuers?tabs=HTTP
      */
-    public function fetchCertificate(): SetaPDF_Signer_X509_Certificate
+    public function fetchCertificate(): Certificate
     {
         try {
             $response = $this->httpClient->sendRequest(
@@ -304,7 +303,7 @@ class Module implements
         if (!isset($certificate['cer'])) {
             throw new Exception('Couldn\'t find certificate in response.');
         }
-        return new SetaPDF_Signer_X509_Certificate($certificate['cer']);
+        return new Certificate($certificate['cer']);
     }
 
     /**
@@ -315,7 +314,7 @@ class Module implements
      *
      * @param string $digest
      * @return string
-     * @throws SetaPDF_Signer_Exception
+     * @throws Exception
      * @see https://learn.microsoft.com/en-us/rest/api/keyvault/keys/sign/sign?tabs=HTTP
      */
     protected function sign(string $digest): string
@@ -355,9 +354,8 @@ class Module implements
     }
 
     /**
-     * @return SetaPDF_Signer_X509_Certificate|string
-     * @throws Exception
-     * @throws SetaPDF_Signer_Asn1_Exception
+     * @return string|Certificate
+     * @throws \setasign\SetaPDF2\Signer\Exception
      */
     public function getCertificate()
     {
@@ -366,7 +364,7 @@ class Module implements
         $certificate = $module->getCertificate();
         if ($certificate === null) {
             $certificate = $this->fetchCertificate();
-            $module->setCertificate($certificate);
+            $this->setCertificate($certificate);
         }
 
         return $certificate;
@@ -375,8 +373,8 @@ class Module implements
     /**
      * @inheritDoc
      * @throws Exception
-     * @throws SetaPDF_Signer_Exception
-     * @throws SetaPDF_Signer_Asn1_Exception
+     * @throws \setasign\SetaPDF2\Signer\Exception
+     * @throws Asn1Exception
      */
     public function createSignature(FilePath $tmpPath)
     {
@@ -480,14 +478,14 @@ class Module implements
 
         if (\in_array($signatureAlgorithm, ['ES256', 'ES256K', 'ES384', 'ES512'], true)) {
             // THIS NEEDS TO BE USED TO FIX EC SIGNATURES
-            $len = strlen($signatureValue);
+            $len = \strlen($signatureValue);
 
-            $s = substr($signatureValue, 0, $len / 2);
-            if (ord($s[0]) & 0x80) { // ensure positive integers
+            $s = \substr($signatureValue, 0, $len / 2);
+            if (\ord($s[0]) & 0x80) { // ensure positive integers
                 $s = "\0" . $s;
             }
-            $r = substr($signatureValue, $len / 2);
-            if (ord($r[0]) & 0x80) { // ensure positive integers
+            $r = \substr($signatureValue, $len / 2);
+            if (\ord($r[0]) & 0x80) { // ensure positive integers
                 $r = "\0" . $r;
             }
 
